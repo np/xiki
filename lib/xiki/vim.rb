@@ -1,6 +1,8 @@
 module XikiVim
   INDENT    = ' ' * 2
-  INDENT_RE = /^(\s*)/
+  INDENT_RE = /\A(\s*)/
+  UNFOLDED_ITEM_RE = /\A(\s*)-/
+  FOLDED_ITEM_RE = /\A(\s*)+/
 end
 
 %w{ vim/tree }.each do |lib|
@@ -17,7 +19,7 @@ module XikiVim
     cur_id_lvl = 1e10
 
     # build path as long as line starts with whitespaces
-    until (match = buffer[line + offset].match(/^(\s+)/)).nil?
+    until (match = buffer[line + offset].match(/\A(\s+)/)).nil?
       line_id_lvl = match[1].length
 
       # check if we reached a parent, and append it to path
@@ -34,10 +36,12 @@ module XikiVim
 
   # FIXME error handling on shell out
   def self.take_action buffer, path
-    ensure_format buffer
+    # NP: I don't see the point, and it also introduce issues
+    #     since not all lines have to be menu items.
+    # ensure_format buffer
 
-    if expanded? buffer.line
-      buffer[buffer.line_number] = buffer.line.gsub(/-/, '+')
+    if unfolded? buffer.line
+      buffer[buffer.line_number] = buffer.line.gsub(UNFOLDED_ITEM_RE, '\1+')
       block(buffer, true)
     else
       # check cache
@@ -49,12 +53,12 @@ module XikiVim
   end
 
   protected
-  def self.expanded? line
-    line.lstrip[0].chr == '-'
+  def self.unfolded? line
+    !!(line =~ UNFOLDED_ITEM_RE)
   end
 
   def self.sanitize line
-    line.strip.gsub(/^\+\s*|^-\s*/, '')
+    line.rstrip.gsub(/\A\s*[+-]?\s*/, '')
   end
 
   # get the sub-block (indentation-wise), optionally delete it
@@ -71,6 +75,7 @@ module XikiVim
     return buffer
   end
 
+  # unused
   def self.ensure_format buffer
     char = buffer.line.lstrip[0].chr
     if char != '-' && char != '+'
